@@ -1,0 +1,3 @@
+%__gobject_introspection_provides %{_rpmconfigdir}/gobject-introspection-dep-tool provides
+%__gobject_introspection_requires %{_rpmconfigdir}/gobject-introspection-dep-tool requires
+%__gobject_introspection_path ^%{_libdir}/girepository-1.0/*.typelib$

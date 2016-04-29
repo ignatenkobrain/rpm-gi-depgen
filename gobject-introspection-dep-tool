@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+# gobject-introspection-dep-tool
+#
+# Copyright © 2016 Igor Gnatenko <ignatenko@redhat.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import argparse
+import os
+import subprocess
+import sys
+
+_TYPELIB_SUFFIX = ".typelib"
+
+def _split_nv(s):
+    if "-" in s:
+        ns, ver = s.rsplit("-", 1)
+    else:
+        ns = bname
+        ver = None
+    return ns, ver
+
+def _print_typelib(ns, ver=None):
+    if ver is not None:
+        print("typelib({ns!s}) = {ver!s}".format(ns=ns, ver=ver))
+    else:
+        print("typelib({ns!s})".format(ns=ns))
+
+class TypelibProvides(object):
+    def __init__(self, filelist=None):
+        if filelist is None:
+            filelist = sys.stdin
+
+        paths = map(lambda x: x.rstrip(), filelist.readlines())
+        for path in paths:
+            if not path.endswith(_TYPELIB_SUFFIX):
+                continue
+            ns, ver = _split_nv(os.path.basename(path)[:-len(_TYPELIB_SUFFIX)])
+            _print_typelib(ns, ver)
+
+class TypelibRequires(object):
+    _TYPELIB_PREFIX = "typelib: "
+    _SHLIB_PREFIX = "shlib: "
+
+    def __init__(self, filelist=None):
+        if filelist is None:
+            filelist = sys.stdin
+
+        paths = map(lambda x: x.rstrip(), filelist.readlines())
+        for path in paths:
+            if path.endswith(_TYPELIB_SUFFIX):
+                ns, ver = _split_nv(os.path.basename(path)[:-len(_TYPELIB_SUFFIX)])
+                cmd = ["g-ir-dep-tool", "--namespace", ns]
+                if ver is not None:
+                    cmd += ["--version", ver]
+                result = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
+                for line in result.stdout.decode("utf-8").split("\n"):
+                    line = line.rstrip()
+                    if len(line) == 0:
+                        continue
+                    if line.startswith(self._TYPELIB_PREFIX):
+                        ns, ver = _split_nv(line[len(self._TYPELIB_PREFIX):])
+                        _print_typelib(ns, ver)
+                    elif line.startswith(self._SHLIB_PREFIX):
+                        lib = line[len(self._SHLIB_PREFIX):]
+                        is_64bits = sys.maxsize > 2**32
+                        if is_64bits:
+                            print("{lib!s}()(64bit)".format(lib=lib))
+                        else:
+                            print("{lib!s}".format(lib=lib))
+                    else:
+                        raise NotImplementedError
+            else:
+                raise NotImplementedError
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=("provides", "requires"))
+    args = parser.parse_args()
+
+    if args.action == "provides":
+        TypelibProvides()
+    elif args.action == "requires":
+        TypelibRequires()
+    else:
+        raise NotImplementedError("Unknown action '{}'".format(arg.action))
