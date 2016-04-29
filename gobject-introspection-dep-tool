@@ -61,7 +61,7 @@ class TypelibRequires(object):
         for path in paths:
             if path.endswith(_TYPELIB_SUFFIX):
                 ns, ver = _split_nv(os.path.basename(path)[:-len(_TYPELIB_SUFFIX)])
-                cmd = ["g-ir-dep-tool", "--namespace", ns]
+                cmd = ["g-ir-inspect", "--print-typelibs", "--print-shlibs", ns]
                 if ver is not None:
                     cmd += ["--version", ver]
                 result = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
